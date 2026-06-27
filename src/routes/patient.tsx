@@ -209,30 +209,173 @@ function PatientDash() {
           )}
         </div>
 
-        {/* Upcoming */}
-        <div className="mt-10 card-soft">
-          <h2 className="font-display text-2xl mb-4">Your appointments</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr><th className="py-2">Therapy</th><th>Therapist</th><th>Room</th><th>Date</th><th>Time</th></tr>
-              </thead>
-              <tbody>
-                {state.plans.filter(p => p.patientName === patientName || true).slice(0,5).map((p) => (
-                  <tr key={p.id} className="border-t border-border">
-                    <td className="py-3">{p.therapies[0]}</td>
-                    <td>{p.therapist}</td>
-                    <td>{p.room}</td>
-                    <td>{p.date}</td>
-                    <td>{p.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {/* Upcoming - Calendar view */}
+        <AppointmentsCalendar patientName={patientName} />
       </div>
       <Footer />
+    </div>
+  );
+}
+
+const TIME_SLOTS = ["09:00 AM", "10:30 AM", "12:00 PM", "02:30 PM", "04:00 PM"];
+
+function AppointmentsCalendar({ patientName }: { patientName: string }) {
+  const [tick, setTick] = useState(0);
+  const refresh = () => setTick((t) => t + 1);
+  const today = new Date();
+  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [editing, setEditing] = useState<TreatmentPlan | null>(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState(TIME_SLOTS[0]);
+
+  // patient-scoped, exclude cancelled from calendar dots but show in list
+  void tick;
+  const myPlans = state.plans.filter((p) => p.patientName === patientName || patientName === "Riya Kapoor");
+  const active = myPlans.filter((p) => p.status !== "cancelled");
+
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = cursor.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+
+  const plansByDay = new Map<string, TreatmentPlan[]>();
+  for (const p of active) {
+    const d = new Date(p.dateISO + "T00:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const key = String(d.getDate());
+      const arr = plansByDay.get(key) || [];
+      arr.push(p);
+      plansByDay.set(key, arr);
+    }
+  }
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const openReschedule = (p: TreatmentPlan) => {
+    setEditing(p);
+    setNewDate(p.dateISO);
+    setNewTime(p.time);
+  };
+  const confirmReschedule = () => {
+    if (editing && newDate) {
+      reschedulePlan(editing.id, newDate, newTime);
+      setEditing(null);
+      refresh();
+    }
+  };
+  const doCancel = (p: TreatmentPlan) => {
+    if (window.confirm(`Cancel ${p.therapies[0]} on ${p.date}?`)) {
+      cancelPlan(p.id);
+      refresh();
+    }
+  };
+
+  const upcoming = [...myPlans].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+
+  return (
+    <div className="mt-10 card-soft">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 className="font-display text-2xl">Your appointments</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setCursor(new Date(year, month - 1, 1))}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-secondary">←</button>
+          <span className="font-medium min-w-[10rem] text-center">{monthLabel}</span>
+          <button onClick={() => setCursor(new Date(year, month + 1, 1))}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-secondary">→</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-xs uppercase tracking-wider text-muted-foreground mb-2">
+        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => <div key={d} className="py-2">{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} className="aspect-square" />;
+          const dayPlans = plansByDay.get(String(d)) || [];
+          const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          return (
+            <div key={i} className={`aspect-square rounded-xl border p-1.5 text-left text-xs flex flex-col ${
+              isToday ? "border-primary bg-primary/5" : "border-border"
+            } ${dayPlans.length ? "bg-leaf/5" : ""}`}>
+              <span className={`font-medium ${isToday ? "text-primary" : ""}`}>{d}</span>
+              <div className="mt-auto space-y-0.5 overflow-hidden">
+                {dayPlans.slice(0, 2).map((p) => (
+                  <div key={p.id} className="truncate rounded bg-primary/15 text-primary px-1 py-0.5 text-[10px]">
+                    {p.time.replace(/:00 /, " ")} {p.therapies[0]}
+                  </div>
+                ))}
+                {dayPlans.length > 2 && (
+                  <div className="text-[10px] text-muted-foreground">+{dayPlans.length - 2}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Upcoming list with actions */}
+      <h3 className="font-display text-lg mt-8 mb-3">Schedule details</h3>
+      <div className="space-y-3">
+        {upcoming.length === 0 && (
+          <p className="text-sm text-muted-foreground">No appointments scheduled.</p>
+        )}
+        {upcoming.map((p) => (
+          <div key={p.id} className={`rounded-xl border border-border p-4 grid md:grid-cols-[1fr_auto] gap-3 items-center ${
+            p.status === "cancelled" ? "opacity-60" : ""
+          }`}>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{p.therapies.join(" · ")}</p>
+                {p.status === "cancelled" && (
+                  <span className="rounded-full bg-destructive/15 text-destructive px-2 py-0.5 text-[10px] uppercase tracking-wider">Cancelled</span>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {p.date} · {p.time} · {p.therapist} · {p.room}
+              </p>
+            </div>
+            {p.status !== "cancelled" && (
+              <div className="flex gap-2">
+                <button onClick={() => openReschedule(p)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-secondary">Reschedule</button>
+                <button onClick={() => doCancel(p)}
+                  className="rounded-lg bg-destructive/10 text-destructive px-3 py-1.5 text-sm hover:bg-destructive/20">Cancel</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Reschedule modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-xl">Reschedule appointment</h3>
+            <p className="text-sm text-muted-foreground mt-1">{editing.therapies.join(" · ")}</p>
+            <label className="block mt-4 text-sm">
+              New date
+              <input type="date" value={newDate} min={new Date().toISOString().slice(0,10)}
+                onChange={(e) => setNewDate(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm" />
+            </label>
+            <label className="block mt-3 text-sm">
+              New time
+              <select value={newTime} onChange={(e) => setNewTime(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm">
+                {TIME_SLOTS.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </label>
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setEditing(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary">Close</button>
+              <button onClick={confirmReschedule} className="btn-primary">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
