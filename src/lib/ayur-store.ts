@@ -163,9 +163,11 @@ state.plans.push({
   therapist: "Therapist Rohan",
   room: "Room 102 – Pitta Suite",
   date: new Date(Date.now() + 86400000).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+  dateISO: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
   time: "10:30 AM",
   notes: "Daily warm oil massage; avoid cold foods.",
   createdAt: new Date().toISOString(),
+  status: "scheduled",
 });
 
 state.sideEffects.push({
