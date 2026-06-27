@@ -97,6 +97,7 @@ export function generatePlan(input: {
   const time = ROUND_TIMES[idx % ROUND_TIMES.length];
   const d = new Date(); d.setDate(d.getDate() + 1 + (idx % 5));
   const date = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const dateISO = d.toISOString().slice(0, 10);
 
   const plan: TreatmentPlan = {
     id: id("plan"),
@@ -107,14 +108,32 @@ export function generatePlan(input: {
     therapist,
     room,
     date,
+    dateISO,
     time,
     notes: `Based on reported concerns${input.age ? ` (age ${input.age})` : ""}${
       input.lifestyle ? `, lifestyle: ${input.lifestyle}` : ""
     }. Follow a sattvic diet, warm water intake, and early sleep.`,
     createdAt: new Date().toISOString(),
+    status: "scheduled",
   };
   state.plans.unshift(plan);
   return plan;
+}
+
+export function reschedulePlan(planId: string, isoDate: string, time?: string) {
+  const p = state.plans.find((x) => x.id === planId);
+  if (!p) return null;
+  const d = new Date(isoDate + "T00:00:00");
+  p.dateISO = isoDate;
+  p.date = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  if (time) p.time = time;
+  return p;
+}
+
+export function cancelPlan(planId: string) {
+  const p = state.plans.find((x) => x.id === planId);
+  if (p) p.status = "cancelled";
+  return p;
 }
 
 export function reportSideEffect(s: Omit<SideEffect, "id" | "createdAt">): SideEffect {
