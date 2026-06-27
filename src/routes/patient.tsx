@@ -26,7 +26,7 @@ function PatientDash() {
   const [seDesc, setSeDesc] = useState("");
   const [seSent, setSeSent] = useState(false);
 
-  const patientName = session?.name || "Riya Kapoor";
+  const patientName = session?.name || "Patient";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
