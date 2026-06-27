@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Navbar, Footer } from "@/components/Navbar";
-import { generatePlan, reportSideEffect, state, getRole, type TreatmentPlan } from "@/lib/ayur-store";
+import { generatePlan, reportSideEffect, reschedulePlan, cancelPlan, state, getRole, type TreatmentPlan } from "@/lib/ayur-store";
 
 export const Route = createFileRoute("/patient")({
   head: () => ({ meta: [{ title: "Patient dashboard — AyurSutra" }] }),
