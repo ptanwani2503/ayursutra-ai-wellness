@@ -16,9 +16,11 @@ export type TreatmentPlan = {
   therapist: string;
   room: string;
   date: string;
+  dateISO: string;
   time: string;
   notes: string;
   createdAt: string;
+  status: "scheduled" | "cancelled";
 };
 
 export type SideEffect = {
